@@ -1,0 +1,31 @@
+#!/usr/bin/env php
+<?php
+
+// Find autoload.php - works both locally and globally
+// Local: vendor/autoload.php relative to bin directory
+// Global: vendor/laravel-afterburner/installer/vendor/autoload.php or global autoload.php
+
+$autoloadPaths = [
+    __DIR__ . '/../vendor/autoload.php',      // Local development
+    __DIR__ . '/../../../autoload.php',       // Global installation
+];
+
+$autoloadPath = null;
+foreach ($autoloadPaths as $path) {
+    if (file_exists($path)) {
+        $autoloadPath = $path;
+        break;
+    }
+}
+
+if (!$autoloadPath) {
+    die('Could not find autoload.php. Please run composer install.' . PHP_EOL);
+}
+
+require $autoloadPath;
+
+use Afterburner\Installer\Console\Commands\NewCommand;
+
+$app = new Symfony\Component\Console\Application('Afterburner Installer', '1.0.4');
+$app->add(new NewCommand());
+$app->run();
