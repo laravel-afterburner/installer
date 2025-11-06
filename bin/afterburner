@@ -26,6 +26,9 @@ require $autoloadPath;
 
 use Afterburner\Installer\Console\Commands\NewCommand;
 
-$app = new Symfony\Component\Console\Application('Afterburner Installer', '1.0.4');
+$composer = json_decode(file_get_contents(__DIR__ . '/../composer.json'), true);
+$version = $composer['version'] ?? 'dev';
+
+$app = new Symfony\Component\Console\Application('Afterburner Installer', $version);
 $app->add(new NewCommand());
 $app->run();

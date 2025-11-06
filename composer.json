@@ -1,6 +1,7 @@
 {
     "name": "laravel-afterburner/installer",
     "description": "Afterburner project installer - Create new Laravel projects with Afterburner",
+    "version": "1.0.0",
     "type": "library",
     "license": "MIT",
     "require": {
