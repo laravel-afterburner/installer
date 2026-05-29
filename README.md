@@ -27,7 +27,7 @@ This will:
 1. Create a new Laravel project using the Afterburner template
 2. Install all core dependencies
 3. Set up the project structure
-4. Optionally install add-on packages (Documents, Communications, Voting, Meetings, Subscriptions) via interactive prompts after migrations
+4. Optionally install add-on packages (Documents, Communications, Voting, Meetings, Playbook, Subscriptions) via interactive prompts after migrations
 
 ## Add-on packages
 
@@ -37,6 +37,7 @@ During `afterburner new`, you can select:
 - **Communications** — `laravel-afterburner/communications` ^1.0
 - **Voting** — `laravel-afterburner/voting` ^1.0
 - **Meetings** — `laravel-afterburner/meetings` ^1.0
+- **Playbook** — `laravel-afterburner/playbook` ^1.0
 - **Subscriptions** — `laravel-afterburner/subscriptions` ^1.0
 
 Each selection runs `composer require` and the package install Artisan command (`afterburner:voting:install`, etc.).

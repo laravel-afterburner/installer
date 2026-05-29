@@ -57,6 +57,15 @@ class PackageRegistry
                 'requires' => [],
                 'available' => true,
             ],
+            'playbook' => [
+                'label' => 'Playbook',
+                'composer' => 'laravel-afterburner/playbook',
+                'version' => '^1.0',
+                'install_command' => 'afterburner:playbook:install',
+                'description' => 'In-app documentation with platform guides and package-specific sections',
+                'requires' => [],
+                'available' => true,
+            ],
             'subscriptions' => [
                 'label' => 'Subscriptions',
                 'composer' => 'laravel-afterburner/subscriptions',
