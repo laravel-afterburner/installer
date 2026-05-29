@@ -7,7 +7,9 @@ use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Process\Process;
+use Afterburner\Installer\Installers\AddonInstaller;
 use Afterburner\Installer\Installers\CoreInstaller;
+use Afterburner\Installer\Support\PackageRegistry;
 use function Laravel\Prompts\text;
 use function Laravel\Prompts\select;
 use function Laravel\Prompts\confirm;
@@ -110,6 +112,7 @@ class NewCommand extends Command
             'npmInstalled' => false,
             'assetsCompiled' => false,
             'featuresSelected' => [],
+            'addonsSelected' => [],
         ];
 
         // Ensure .env file exists
@@ -171,7 +174,10 @@ class NewCommand extends Command
             if ($migrationSuccess) {
                 $featuresSelected = $this->promptFeatures($directory, $output);
                 $details['featuresSelected'] = $featuresSelected;
-                
+
+                $addonsSelected = $this->promptAddons($directory, $output);
+                $details['addonsSelected'] = $addonsSelected;
+
                 // Prompt for entity type (optional) - needed for seeding
                 $entityType = $this->promptEntityType($envPath, $envExamplePath, $output);
                 $details['entityType'] = $entityType;
@@ -671,6 +677,63 @@ class NewCommand extends Command
         }
 
         return $selectedFeaturesSnakeCase;
+    }
+
+    /**
+     * Prompt for Afterburner add-on package installation.
+     *
+     * @return list<string>
+     */
+    protected function promptAddons(string $directory, OutputInterface $output): array
+    {
+        $packages = PackageRegistry::available();
+
+        if ($packages === []) {
+            return [];
+        }
+
+        $installAddons = confirm(
+            label: 'Would you like to install Afterburner add-on packages?',
+            default: false
+        );
+
+        if (! $installAddons) {
+            return [];
+        }
+
+        $options = [];
+        foreach ($packages as $key => $package) {
+            $options[$key] = $package['label'].' — '.$package['description'];
+        }
+
+        $selected = multiselect(
+            label: 'Which add-on packages would you like to install?',
+            options: $options,
+            default: [],
+            hint: 'Use the space bar to select packages. Press Enter to confirm.'
+        );
+
+        if ($selected === []) {
+            $output->writeln('<comment>No add-ons selected.</comment>');
+
+            return [];
+        }
+
+        try {
+            $installer = new AddonInstaller($output);
+            $installed = $installer->install($directory, $selected);
+
+            if ($installed !== []) {
+                $output->writeln('<info>Add-on packages installed successfully.</info>');
+            }
+
+            return $installed;
+        } catch (\Exception $e) {
+            $output->writeln('<error>Add-on installation failed: '.$e->getMessage().'</error>');
+            $output->writeln('<comment>You can install add-ons manually with composer require and the package install commands.</comment>');
+
+            return [];
+        }
     }
 
     /**
@@ -1231,6 +1294,18 @@ class NewCommand extends Command
             $output->writeln('');
         }
         
+        // Add-ons
+        if (! empty($details['addonsSelected'])) {
+            $output->writeln('<comment>Add-on Packages:</comment>');
+            $output->writeln('  <info>Installed:</info>');
+            foreach ($details['addonsSelected'] as $addonKey) {
+                $package = PackageRegistry::all()[$addonKey] ?? null;
+                $label = $package['label'] ?? $addonKey;
+                $output->writeln("    <info>•</info> {$label}");
+            }
+            $output->writeln('');
+        }
+
         // Seeds
         if ($details['seedsRun']) {
             $output->writeln('<comment>Database Seeding:</comment>');
