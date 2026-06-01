@@ -157,8 +157,10 @@ class NewCommand extends Command
         }
 
         // Prompt for system admin configuration (optional)
-        $systemAdminConfigured = $this->promptSystemAdmin($envPath, $envExamplePath, $output);
-        $details['systemAdminConfigured'] = $systemAdminConfigured;
+        $adminDetails = $this->promptSystemAdmin($output);
+        $details['systemAdminConfigured'] = $adminDetails !== null;
+        $details['adminEmail'] = $adminDetails['email'] ?? 'admin@laravel-afterburner.com';
+        $details['adminName'] = $adminDetails['name'] ?? null;
 
         // Prompt for migrations after database is ready
         $runMigrations = confirm(
@@ -178,8 +180,8 @@ class NewCommand extends Command
                 $addonsSelected = $this->promptAddons($directory, $output);
                 $details['addonsSelected'] = $addonsSelected;
 
-                // Prompt for entity type (optional) - needed for seeding
-                $entityType = $this->promptEntityType($envPath, $envExamplePath, $output);
+                // Prompt for entity type (optional) - passed to afterburner:seed-install
+                $entityType = $this->promptEntityType($output);
                 $details['entityType'] = $entityType;
 
                 $runSeeds = confirm(
@@ -188,7 +190,7 @@ class NewCommand extends Command
                 );
 
                 if ($runSeeds) {
-                    $seedsSuccess = $this->runSeeds($directory, $output);
+                    $seedsSuccess = $this->runSeeds($directory, $output, $entityType, $adminDetails);
                     $details['seedsRun'] = $seedsSuccess;
                 }
             }
@@ -515,8 +517,10 @@ class NewCommand extends Command
 
     /**
      * Prompt for system admin configuration (optional).
+     *
+     * @return array{name: string, email: string}|null
      */
-    protected function promptSystemAdmin(string $envPath, string $envExamplePath, OutputInterface $output): bool
+    protected function promptSystemAdmin(OutputInterface $output): ?array
     {
         $setSystemAdmin = confirm(
             label: 'Would you like to configure the system admin?',
@@ -540,22 +544,21 @@ class NewCommand extends Command
                 }
             );
 
-            // Update .env if it exists, otherwise update .env.example
-            $targetFile = file_exists($envPath) ? $envPath : $envExamplePath;
-            // Quote username and email to handle special characters
-            $this->updateEnvFile($targetFile, 'AFTERBURNER_USERNAME', $this->escapeEnvValue($username));
-            $this->updateEnvFile($targetFile, 'AFTERBURNER_EMAIL', $this->escapeEnvValue($email));
-            $output->writeln('<info>System admin configuration saved.</info>');
-            return true;
+            $output->writeln('<info>System admin will be created when you seed the database.</info>');
+
+            return [
+                'name' => $username,
+                'email' => $email,
+            ];
         }
 
-        return false;
+        return null;
     }
 
     /**
      * Prompt for entity type selection (optional).
      */
-    protected function promptEntityType(string $envPath, string $envExamplePath, OutputInterface $output): ?string
+    protected function promptEntityType(OutputInterface $output): ?string
     {
         $setEntityType = confirm(
             label: 'Would you like to set the entity type?',
@@ -574,11 +577,8 @@ class NewCommand extends Command
                 default: 'team'
             );
 
-            // Update .env if it exists, otherwise update .env.example
-            $targetFile = file_exists($envPath) ? $envPath : $envExamplePath;
-            $this->updateEnvFile($targetFile, 'AFTERBURNER_ENTITY_LABEL', $entityType);
-            $output->writeln("<info>AFTERBURNER_ENTITY_LABEL set to {$entityType}</info>");
-            
+            $output->writeln("<info>Entity type will be saved to config/afterburner.php when seeding ({$entityType}).</info>");
+
             return $entityType;
         }
 
@@ -1102,12 +1102,24 @@ class NewCommand extends Command
     }
 
     /**
-     * Run database seeding.
+     * Run database seeding via afterburner:seed-install.
+     *
+     * @param  array{name: string, email: string}|null  $adminDetails
      */
-    protected function runSeeds(string $directory, OutputInterface $output): bool
+    protected function runSeeds(string $directory, OutputInterface $output, ?string $entityType, ?array $adminDetails): bool
     {
-        // Entity type is already set in .env file, so RolesSeeder can read it from there
-        $process = new Process(['php', 'artisan', 'db:seed', '--force'], $directory);
+        $command = ['php', 'artisan', 'afterburner:seed-install', '--force'];
+
+        if ($entityType) {
+            $command[] = '--entity='.$entityType;
+        }
+
+        if ($adminDetails) {
+            $command[] = '--admin-name='.$adminDetails['name'];
+            $command[] = '--admin-email='.$adminDetails['email'];
+        }
+
+        $process = new Process($command, $directory);
         $process->setTimeout(300);
         $process->run(function ($type, $line) use ($output) {
             $output->write($line);
@@ -1212,9 +1224,8 @@ class NewCommand extends Command
     protected function displayInstallationSummary(string $directory, OutputInterface $output, array $details): void
     {
         $envPath = $directory . '/.env';
-        
-        // Get admin email (either from AFTERBURNER_EMAIL or default)
-        $adminEmail = $this->readEnvValue($envPath, 'AFTERBURNER_EMAIL', 'admin@laravel-afterburner.com');
+
+        $adminEmail = $details['adminEmail'] ?? 'admin@laravel-afterburner.com';
         
         // Get APP_URL (default to http://localhost if not set)
         $appUrl = $this->readEnvValue($envPath, 'APP_URL', 'http://localhost');
@@ -1330,10 +1341,12 @@ class NewCommand extends Command
         }
         
         // System Admin Login
-        $output->writeln('<comment>System Admin Login:</comment>');
-        $output->writeln("  <info>Email:</info> {$adminEmail}");
-        $output->writeln('  <info>Password:</info> Afterburner');
-        $output->writeln('');
+        if ($details['seedsRun']) {
+            $output->writeln('<comment>System Admin Login:</comment>');
+            $output->writeln("  <info>Email:</info> {$adminEmail}");
+            $output->writeln('  <info>Password:</info> Afterburner');
+            $output->writeln('');
+        }
         
         // Application URL
         $output->writeln('<comment>Application URL:</comment>');

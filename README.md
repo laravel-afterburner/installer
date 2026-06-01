@@ -56,8 +56,10 @@ After creating your application:
 ```bash
 cd my-app
 php artisan migrate
-php artisan db:seed --class=RolesSeeder  # Optional
+php artisan afterburner:seed-install
 ```
+
+During `afterburner new`, optional prompts set the entity type in `config/afterburner.php` and pass admin details to `afterburner:seed-install` — not to `.env`.
 
 ## Requirements
 

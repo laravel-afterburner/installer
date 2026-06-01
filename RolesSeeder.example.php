@@ -12,7 +12,7 @@ class RolesSeeder extends Seeder
      */
     public function run(): void
     {
-        $entityLabel = env('AFTERBURNER_ENTITY_LABEL', 'team');
+        $entityLabel = config('afterburner.entity_label', 'team');
 
         $roles = $this->getRolesForEntityType($entityLabel);
 
