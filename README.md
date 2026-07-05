@@ -61,6 +61,8 @@ php artisan afterburner:seed-install
 
 During `afterburner new`, optional prompts set the entity type in `config/afterburner.php` and pass admin details to `afterburner:seed-install` — not to `.env`.
 
+Council roles (directory, voting council electorate, council discussions, meeting action items) are driven by the **Council Role** checkbox on each role in **Role Management**. Fresh strata installs seed `president`, `vice_president`, `treasurer`, `secretary`, and `council_member` with that flag enabled.
+
 ## Requirements
 
 - PHP ^8.2

@@ -21,7 +21,9 @@ class CoreInstaller
     {
         $this->output->writeln('<comment>Creating Laravel project with Afterburner template...</comment>');
 
-        // Use composer create-project to clone the template
+        // Skip template post-create-project scripts: they call afterburner:seed-install
+        // with --force, which that command does not support. Post-install steps are
+        // handled by the installer's postInstall() flow instead.
         $process = new Process([
             'composer',
             'create-project',
@@ -29,6 +31,7 @@ class CoreInstaller
             $directory,
             '--prefer-dist',
             '--no-interaction',
+            '--no-scripts',
         ]);
 
         $process->setTimeout(600); // 10 minutes timeout

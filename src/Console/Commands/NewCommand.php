@@ -147,6 +147,10 @@ class NewCommand extends Command
 
         $output->writeln('<info>Default database updated.</info>');
 
+        if ($database === 'sqlite') {
+            $this->ensureSqliteDatabase($directory, $output);
+        }
+
         // Clear config cache immediately after updating .env to ensure Laravel uses new database name
         $this->clearConfigCache($directory, $output);
 
@@ -171,6 +175,10 @@ class NewCommand extends Command
         if ($runMigrations) {
             $migrationSuccess = $this->runMigrations($directory, $output);
             $details['migrationsRun'] = $migrationSuccess;
+
+            if ($migrationSuccess) {
+                $this->runAfterburnerInstall($directory, $output);
+            }
             
             // If migrations were successful, prompt for feature selection
             if ($migrationSuccess) {
@@ -1102,13 +1110,56 @@ class NewCommand extends Command
     }
 
     /**
+     * Ensure the SQLite database file exists before running migrations.
+     */
+    protected function ensureSqliteDatabase(string $directory, OutputInterface $output): void
+    {
+        $databasePath = $directory.'/database/database.sqlite';
+        $databaseDir = dirname($databasePath);
+
+        if (! is_dir($databaseDir)) {
+            mkdir($databaseDir, 0755, true);
+        }
+
+        if (! file_exists($databasePath)) {
+            touch($databasePath);
+            $output->writeln('<info>SQLite database file created.</info>');
+        }
+    }
+
+    /**
+     * Run the core Afterburner package install step.
+     */
+    protected function runAfterburnerInstall(string $directory, OutputInterface $output): bool
+    {
+        $process = new Process(
+            ['php', 'artisan', 'afterburner:install', '--force', '--no-interaction'],
+            $directory
+        );
+        $process->setTimeout(300);
+        $process->run(function ($type, $line) use ($output) {
+            $output->write($line);
+        });
+
+        if (! $process->isSuccessful()) {
+            $output->writeln('<comment>Afterburner install may have failed. Please check the output above.</comment>');
+
+            return false;
+        }
+
+        $output->writeln('<info>Afterburner packages configured successfully.</info>');
+
+        return true;
+    }
+
+    /**
      * Run database seeding via afterburner:seed-install.
      *
      * @param  array{name: string, email: string}|null  $adminDetails
      */
     protected function runSeeds(string $directory, OutputInterface $output, ?string $entityType, ?array $adminDetails): bool
     {
-        $command = ['php', 'artisan', 'afterburner:seed-install', '--force'];
+        $command = ['php', 'artisan', 'afterburner:seed-install'];
 
         if ($entityType) {
             $command[] = '--entity='.$entityType;
