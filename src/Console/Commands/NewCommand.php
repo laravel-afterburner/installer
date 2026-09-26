@@ -111,6 +111,7 @@ class NewCommand extends Command
             'domainConfigured' => false,
             'npmInstalled' => false,
             'assetsCompiled' => false,
+            'storageLinked' => false,
             'featuresSelected' => [],
             'addonsSelected' => [],
         ];
@@ -122,6 +123,9 @@ class NewCommand extends Command
 
         // Generate application key if needed
         $this->generateApplicationKey($directory, $output);
+
+        // Public disk files (team logos) are served through public/storage.
+        $details['storageLinked'] = $this->linkPublicStorage($directory, $output);
 
         // Prompt for domain configuration (optional)
         $domainConfigured = $this->promptDomain($name, $envPath, $envExamplePath, $output);
@@ -179,7 +183,7 @@ class NewCommand extends Command
             if ($migrationSuccess) {
                 $this->runAfterburnerInstall($directory, $output);
             }
-            
+
             // If migrations were successful, prompt for feature selection
             if ($migrationSuccess) {
                 $featuresSelected = $this->promptFeatures($directory, $output);
@@ -1128,7 +1132,43 @@ class NewCommand extends Command
     }
 
     /**
+     * Link public/storage so files on the public disk can be served.
+     *
+     * Skips when the link already exists.
+     */
+    protected function linkPublicStorage(string $directory, OutputInterface $output): bool
+    {
+        $link = $directory.'/public/storage';
+
+        if (is_link($link)) {
+            $output->writeln('<comment>Public storage is already linked.</comment>');
+
+            return true;
+        }
+
+        $process = new Process(['php', 'artisan', 'storage:link'], $directory);
+        $process->setTimeout(60);
+        $process->run(function ($type, $line) use ($output) {
+            $output->write($line);
+        });
+
+        if (! $process->isSuccessful() || ! is_link($link)) {
+            $output->writeln('<comment>storage:link may have failed. Please check the output above.</comment>');
+
+            return false;
+        }
+
+        $output->writeln('<info>Public storage linked.</info>');
+
+        return true;
+    }
+
+    /**
      * Run the core Afterburner package install step.
+     *
+     * Package views stay in the package. Do not pass --with-views or
+     * --publish-views; the host install command loads views unless that
+     * option is given explicitly.
      */
     protected function runAfterburnerInstall(string $directory, OutputInterface $output): bool
     {
@@ -1146,8 +1186,6 @@ class NewCommand extends Command
 
             return false;
         }
-
-        $output->writeln('<info>Afterburner packages configured successfully.</info>');
 
         return true;
     }
@@ -1388,6 +1426,12 @@ class NewCommand extends Command
         if ($details['assetsCompiled']) {
             $output->writeln('<comment>Assets:</comment>');
             $output->writeln('  <info>Status:</info> Compiled');
+            $output->writeln('');
+        }
+
+        if (! empty($details['storageLinked'])) {
+            $output->writeln('<comment>Public Storage:</comment>');
+            $output->writeln('  <info>Status:</info> Linked');
             $output->writeln('');
         }
         
